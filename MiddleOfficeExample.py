@@ -1,7 +1,10 @@
 import math
 import numpy
+import random
 import pandas
 import cProfile
+from scipy.special import expit
+import matplotlib.pyplot as plt
 
 
 class NeuralNetwork:
@@ -16,8 +19,8 @@ class NeuralNetwork:
         self.inputs, self.hidden, self.outputs = inputs + 1, hidden, outputs
         self.ai, self.ah, self.ao = numpy.ones(self.inputs), numpy.ones(self.hidden), numpy.ones(self.outputs)
         # Create very small weight matrices using numpy random matrices
-        self.wi = numpy.random.random((self.inputs, self.hidden))/100
-        self.wo = numpy.random.random((self.hidden, self.outputs))/100
+        self.wi = numpy.random.random((self.inputs, self.hidden))/1000
+        self.wo = numpy.random.random((self.hidden, self.outputs))/1000
         # Create matrices for the BP momentum zero = no bias
         self.ci = numpy.zeros((self.inputs, self.hidden))
         self.co = numpy.zeros((self.hidden, self.outputs))
@@ -99,7 +102,7 @@ class NeuralNetwork:
             classifications.append(round(out, 0))
         return classifications
 
-    def train(self, patterns, iterations=1000, n=0.75, m=0.1):
+    def train(self, patterns, iterations=250, n=0.75, m=0.1):
         """
         This method trains the neural network i.e. iterated back-propagation
         :param patterns: the input patterns
@@ -109,22 +112,36 @@ class NeuralNetwork:
         """
         # n is the learning rate
         # m us the momentum factor
-        errors = []
+        mutation_rate = 0.25
+        errors = [float('+inf')]
+        wo_best, wi_best = self.wo, self.wi
         for i in range(iterations):
             error = 0.0
             for p in patterns:
-                inputs = p[0]
-                targets = p[1]
-                self.forward_pass(numpy.array(inputs))
-                error = error + self.back_propagation(targets, n, m)
+                self.forward_pass(numpy.array(p[0]))
+                error += self.back_propagation(p[1], n, m)
+            print(round(i / iterations * 100, 2), "%\t", error)
+            if random.random() < mutation_rate:
+                print("This is a mutation step")
+                old_wi, old_wo = self.wi, self.wo
+                self.wi = numpy.random.random((self.inputs, self.hidden))/100
+                self.wo = numpy.random.random((self.hidden, self.outputs))/100
+                error_mutation = 0.0
+                for p in patterns:
+                    self.forward_pass(numpy.array(p[0]))
+                    error_mutation += self.back_propagation(p[1], n, m)
+                if error < error_mutation:
+                    self.wi, self.wo = old_wi, old_wo
             errors.append(error)
-            # Early stopping condition
-            if len(errors) > 10:
-                limit = 0.001
-                # This prevents the updates becoming chaotic!
-                improvement = (errors[len(errors) - 10] / errors[i]) - 1
-                if improvement < limit:
-                    break
+            if error == min(errors):
+                wo_best, wi_best = self.wo, self.wi
+        self.wo, self.wi = wo_best, wi_best
+        plt.plot(errors)
+        plt.show()
+
+    def test(self, patterns):
+        for p in patterns:
+            print(p[0], '->', self.forward_pass(p[0]))
 
 
 def get_patterns(file_name):
@@ -156,6 +173,7 @@ def test_network(n, patterns, targets, label):
     classes_in = list(targets)
     classes_out = n.get_classifications(patterns)
     for i in range(len(classes_out)):
+        # print('%.4f' % classes_out[i], '%.4f' % classes_in[i])
         if classes_in[i] == classes_out[i]:
             correct += 1
     print("Accuracy on", label, "set =", float(correct/len(classes_out))*100, "%")
@@ -167,11 +185,12 @@ def main():
     """
     train, train_targets = get_patterns("#TrainingSet.csv")
     test, test_targets = get_patterns("#TestingSet.csv")
-    neural_network = NeuralNetwork(24, 5, 1)
+    neural_network = NeuralNetwork(24, 10, 1)
     neural_network.train(train)
     test_network(neural_network, train, train_targets, "Training")
     test_network(neural_network, test, test_targets, "Testing")
     neural_network.weights()
+
 
 if __name__ == '__main__':
     main()
