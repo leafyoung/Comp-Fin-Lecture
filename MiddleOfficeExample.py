@@ -2,8 +2,6 @@ import math
 import numpy
 import random
 import pandas
-import cProfile
-from scipy.special import expit
 import matplotlib.pyplot as plt
 
 
@@ -102,7 +100,7 @@ class NeuralNetwork:
             classifications.append(round(out, 0))
         return classifications
 
-    def train(self, patterns, iterations=250, n=0.75, m=0.1):
+    def train(self, patterns, iterations=2500, n=0.75, m=0.1):
         """
         This method trains the neural network i.e. iterated back-propagation
         :param patterns: the input patterns
@@ -112,7 +110,7 @@ class NeuralNetwork:
         """
         # n is the learning rate
         # m us the momentum factor
-        mutation_rate = 0.25
+        mutation_rate = 0.05
         errors = [float('+inf')]
         wo_best, wi_best = self.wo, self.wi
         for i in range(iterations):
@@ -173,7 +171,7 @@ def test_network(n, patterns, targets, label):
     classes_in = list(targets)
     classes_out = n.get_classifications(patterns)
     for i in range(len(classes_out)):
-        # print('%.4f' % classes_out[i], '%.4f' % classes_in[i])
+        print('%.4f' % classes_out[i], '%.4f' % classes_in[i])
         if classes_in[i] == classes_out[i]:
             correct += 1
     print("Accuracy on", label, "set =", float(correct/len(classes_out))*100, "%")
