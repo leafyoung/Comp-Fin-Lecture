@@ -6,6 +6,12 @@ import cProfile
 
 class NeuralNetwork:
     def __init__(self, inputs, hidden, outputs):
+        """
+        Initializes the neural network object
+        :param inputs: number of inputs
+        :param hidden: number of hidden neurons
+        :param outputs: number of output neurons
+        """
         # Specify activations and number of units in each layer
         self.inputs, self.hidden, self.outputs = inputs + 1, hidden, outputs
         self.ai, self.ah, self.ao = numpy.ones(self.inputs), numpy.ones(self.hidden), numpy.ones(self.outputs)
@@ -16,7 +22,12 @@ class NeuralNetwork:
         self.ci = numpy.zeros((self.inputs, self.hidden))
         self.co = numpy.zeros((self.hidden, self.outputs))
 
-    def update(self, inputs):
+    def forward_pass(self, inputs):
+        """
+        This method passed the inputs through the network to get the output
+        :param inputs: the input values to pass through (forward pass)
+        :return: the output for the given inputs
+        """
         if len(inputs) != self.inputs-1:
             raise ValueError('wrong number of inputs')
         # Linear functions for the inputs
@@ -36,6 +47,13 @@ class NeuralNetwork:
         return self.ao[:]
 
     def back_propagation(self, targets, n, m):
+        """
+        This method updates the neural network weights using Adjoint Differentiation
+        :param targets: what we expected out
+        :param n: the learning rate
+        :param m: the momentum rate
+        :return: the sum squared error of the network
+        """
         if len(targets) != self.outputs:
             raise ValueError('wrong number of target values')
         # Output layer errors
@@ -58,22 +76,37 @@ class NeuralNetwork:
                 weight_update = hidden_deltas[j]*self.ai[i]
                 self.wi[i][j] += n * weight_update + m * self.ci[i][j]
                 self.ci[i][j] = weight_update
-        # calculate error
+        # Calculate the error - this is a tailor series expansion (derivative)
         errors = 0.5 * (targets - self.ao)**2
         return errors.sum()
 
     def weights(self):
+        """
+        This prints out the weights for introspection
+        """
         print('Input weights:', pandas.DataFrame(self.wi))
         print('Output weights:', pandas.DataFrame(self.wo))
 
     def get_classifications(self, patterns):
+        """
+        This gets the outputs for a set of input patterns (for testing accuracy)
+        :param patterns: the input patterns
+        :return: the output results
+        """
         classifications = []
         for p in patterns:
-            out = self.update(p[0])[0]
+            out = self.forward_pass(p[0])[0]
             classifications.append(round(out, 0))
         return classifications
 
     def train(self, patterns, iterations=1000, n=0.75, m=0.1):
+        """
+        This method trains the neural network i.e. iterated back-propagation
+        :param patterns: the input patterns
+        :param iterations: max iterations (this method has early stopping)
+        :param n: the learning rate
+        :param m: the momentum rate
+        """
         # n is the learning rate
         # m us the momentum factor
         errors = []
@@ -82,7 +115,7 @@ class NeuralNetwork:
             for p in patterns:
                 inputs = p[0]
                 targets = p[1]
-                self.update(numpy.array(inputs))
+                self.forward_pass(numpy.array(inputs))
                 error = error + self.back_propagation(targets, n, m)
             errors.append(error)
             # Early stopping condition
@@ -95,6 +128,11 @@ class NeuralNetwork:
 
 
 def get_patterns(file_name):
+    """
+    This method download the patterns i.e. credit data
+    :param file_name: the file containing the patterns / data
+    :return: the list of patterns in the form [[inputs],[outputs]]
+    """
     pattern_data = pandas.read_csv(file_name)
     pattern_inputs = pattern_data.drop("Target", 1)
     pattern_target = pattern_data["Target"]
@@ -107,6 +145,13 @@ def get_patterns(file_name):
 
 
 def test_network(n, patterns, targets, label):
+    """
+    This just determines the accuracy of the network
+    :param n: the neural network
+    :param patterns: the input patterns in form [[inputs],[outputs]]
+    :param targets: the expected outputs [outputs]
+    :param label: the name of the data set
+    """
     correct = 0
     classes_in = list(targets)
     classes_out = n.get_classifications(patterns)
@@ -117,6 +162,9 @@ def test_network(n, patterns, targets, label):
 
 
 def main():
+    """
+    Main method for testing the neural network
+    """
     train, train_targets = get_patterns("#TrainingSet.csv")
     test, test_targets = get_patterns("#TestingSet.csv")
     neural_network = NeuralNetwork(24, 5, 1)
