@@ -17,8 +17,8 @@ class NeuralNetwork:
         self.inputs, self.hidden, self.outputs = inputs + 1, hidden, outputs
         self.ai, self.ah, self.ao = numpy.ones(self.inputs), numpy.ones(self.hidden), numpy.ones(self.outputs)
         # Create very small weight matrices using numpy random matrices
-        self.wi = numpy.random.random((self.inputs, self.hidden))/1000
-        self.wo = numpy.random.random((self.hidden, self.outputs))/1000
+        self.wi = numpy.random.uniform(-1.0, 1.0, (self.inputs, self.hidden))
+        self.wo = numpy.random.uniform(-1.0, 1.0, (self.inputs, self.outputs))
         # Create matrices for the BP momentum zero = no bias
         self.ci = numpy.zeros((self.inputs, self.hidden))
         self.co = numpy.zeros((self.hidden, self.outputs))
@@ -29,23 +29,33 @@ class NeuralNetwork:
         :param inputs: the input values to pass through (forward pass)
         :return: the output for the given inputs
         """
-        if len(inputs) != self.inputs-1:
+        if len(inputs) != self.inputs - 1:
             raise ValueError('wrong number of inputs')
-        # Linear functions for the inputs
-        for i in range(self.inputs-1):
+        # input activations
+        for i in range(self.inputs - 1):
             self.ai[i] = inputs[i]
-        # Sigmoid functions for the hidden layer
+        # hidden activations
         for j in range(self.hidden):
-            # Weighted sum of inputs * weights
-            weight_sum = self.ai * self.wi[:, j]
-            self.ah[j] = math.tanh(weight_sum.sum())
-        # Sigmoid functions for the output layer
+            sum = 0.0
+            for i in range(self.inputs):
+                sum = sum + self.ai[i] * self.wi[i][j]
+            self.ah[j] = self.sigmoid(sum)
+        # output activations
         for k in range(self.outputs):
-            # Weighted sum of hidden * weights
-            weight_sum = self.ah * self.wo[:, k]
-            self.ao[k] = math.tanh(weight_sum.sum())
-        # Return the outputs
+            sum = 0.0
+            for j in range(self.hidden):
+                sum = sum + self.ah[j] * self.wo[j][k]
+            self.ao[k] = self.sigmoid(sum)
+
         return self.ao[:]
+
+    # our sigmoid function, tanh is a little nicer than the standard 1/(1+e^-x)
+    def sigmoid(self, x):
+        return math.tanh(x)
+
+    # derivative of our sigmoid function, in terms of the output (i.e. y)
+    def dsigmoid(self, y):
+        return 1.0 - y ** 2
 
     def back_propagation(self, targets, n, m):
         """
@@ -58,13 +68,17 @@ class NeuralNetwork:
         if len(targets) != self.outputs:
             raise ValueError('wrong number of target values')
         # Output layer errors
-        errors = targets - self.ao
-        deltas = (1.0 - self.ao**2) * errors
+        deltas = [0.0] * self.outputs
+        for k in range(self.outputs):
+            error = targets[k] - self.ao[k]
+            deltas[k] = self.dsigmoid(self.ao[k]) * error
         # Hidden layer errors
-        hidden_deltas = numpy.zeros(self.hidden)
+        hidden_deltas = [0.0] * self.hidden
         for j in range(self.hidden):
-            error = deltas * self.wo[j, :]
-            hidden_deltas[j] = (1.0 - self.ah[j]**2) * error
+            error = 0.0
+            for k in range(self.outputs):
+                error += deltas[k] * self.wo[j][k]
+            hidden_deltas[j] = self.dsigmoid(self.ah[j]) * error
         # Update the output weights
         for j in range(self.hidden):
             for k in range(self.outputs):
@@ -74,12 +88,14 @@ class NeuralNetwork:
         # Update input weights
         for i in range(self.inputs):
             for j in range(self.hidden):
-                weight_update = hidden_deltas[j]*self.ai[i]
+                weight_update = hidden_deltas[j] * self.ai[i]
                 self.wi[i][j] += n * weight_update + m * self.ci[i][j]
                 self.ci[i][j] = weight_update
         # Calculate the error - this is a tailor series expansion (derivative)
-        errors = 0.5 * (targets - self.ao)**2
-        return errors.sum()
+        error = 0.0
+        for k in range(len(targets)):
+            error += 0.5 * (targets[k] - self.ao[k]) ** 2
+        return error
 
     def weights(self):
         """
@@ -100,7 +116,7 @@ class NeuralNetwork:
             classifications.append(round(out, 0))
         return classifications
 
-    def train(self, patterns, iterations=2500, n=0.75, m=0.1):
+    def train(self, patterns, iterations=2500):
         """
         This method trains the neural network i.e. iterated back-propagation
         :param patterns: the input patterns
@@ -110,31 +126,23 @@ class NeuralNetwork:
         """
         # n is the learning rate
         # m us the momentum factor
-        mutation_rate = 0.05
+        fitness = []
         errors = [float('+inf')]
         wo_best, wi_best = self.wo, self.wi
         for i in range(iterations):
             error = 0.0
             for p in patterns:
                 self.forward_pass(numpy.array(p[0]))
-                error += self.back_propagation(p[1], n, m)
-            print(round(i / iterations * 100, 2), "%\t", error)
-            if random.random() < mutation_rate:
-                print("This is a mutation step")
-                old_wi, old_wo = self.wi, self.wo
-                self.wi = numpy.random.random((self.inputs, self.hidden))/100
-                self.wo = numpy.random.random((self.hidden, self.outputs))/100
-                error_mutation = 0.0
-                for p in patterns:
-                    self.forward_pass(numpy.array(p[0]))
-                    error_mutation += self.back_propagation(p[1], n, m)
-                if error < error_mutation:
-                    self.wi, self.wo = old_wi, old_wo
+                error += self.back_propagation(p[1], 0.7, 0.1)
             errors.append(error)
+            percent = round(i / iterations * 100, 3)
+            if percent % 1.0 == 0:
+                print(percent, "%\t", error)
+                fitness.append(error)
             if error == min(errors):
                 wo_best, wi_best = self.wo, self.wi
         self.wo, self.wi = wo_best, wi_best
-        plt.plot(errors)
+        plt.plot(fitness)
         plt.show()
 
     def test(self, patterns):
@@ -171,10 +179,10 @@ def test_network(n, patterns, targets, label):
     classes_in = list(targets)
     classes_out = n.get_classifications(patterns)
     for i in range(len(classes_out)):
-        print('%.4f' % classes_out[i], '%.4f' % classes_in[i])
+        # print('%.4f' % classes_out[i], '%.4f' % classes_in[i])
         if classes_in[i] == classes_out[i]:
             correct += 1
-    print("Accuracy on", label, "set =", float(correct/len(classes_out))*100, "%")
+    print("Accuracy on", label, "set =", float(correct / len(classes_out)) * 100, "%")
 
 
 def main():
@@ -183,7 +191,7 @@ def main():
     """
     train, train_targets = get_patterns("#TrainingSet.csv")
     test, test_targets = get_patterns("#TestingSet.csv")
-    neural_network = NeuralNetwork(24, 10, 1)
+    neural_network = NeuralNetwork(24, 1, 1)
     neural_network.train(train)
     test_network(neural_network, train, train_targets, "Training")
     test_network(neural_network, test, test_targets, "Testing")
