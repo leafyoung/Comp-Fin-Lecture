@@ -17,8 +17,8 @@ class NeuralNetwork:
         self.inputs, self.hidden, self.outputs = inputs + 1, hidden, outputs
         self.ai, self.ah, self.ao = numpy.ones(self.inputs), numpy.ones(self.hidden), numpy.ones(self.outputs)
         # Create very small weight matrices using numpy random matrices
-        self.wi = numpy.random.uniform(-1.0, 1.0, (self.inputs, self.hidden))
-        self.wo = numpy.random.uniform(-1.0, 1.0, (self.inputs, self.outputs))
+        self.wi = numpy.random.uniform(-0.01, 0.01, (self.inputs, self.hidden))
+        self.wo = numpy.random.uniform(-0.01, 0.01, (self.inputs, self.outputs))
         # Create matrices for the BP momentum zero = no bias
         self.ci = numpy.zeros((self.inputs, self.hidden))
         self.co = numpy.zeros((self.hidden, self.outputs))
@@ -94,7 +94,7 @@ class NeuralNetwork:
         # Calculate the error - this is a tailor series expansion (derivative)
         error = 0.0
         for k in range(len(targets)):
-            error += 0.5 * (targets[k] - self.ao[k]) ** 2
+            error += math.pow(targets[k] - self.ao[k], 2.0)
         return error
 
     def weights(self):
@@ -116,7 +116,7 @@ class NeuralNetwork:
             classifications.append(round(out, 0))
         return classifications
 
-    def train(self, patterns, iterations=2500):
+    def train(self, patterns, iterations=250):
         """
         This method trains the neural network i.e. iterated back-propagation
         :param patterns: the input patterns
@@ -129,6 +129,9 @@ class NeuralNetwork:
         fitness = []
         errors = [float('+inf')]
         wo_best, wi_best = self.wo, self.wi
+        plt.ion()
+        plt.figure(figsize=(10, 10))
+        self.plot_grid("weights/initial", self.wi, self.wo, [])
         for i in range(iterations):
             error = 0.0
             for p in patterns:
@@ -136,14 +139,39 @@ class NeuralNetwork:
                 error += self.back_propagation(p[1], 0.7, 0.1)
             errors.append(error)
             percent = round(i / iterations * 100, 3)
+            if error == min(errors):
+                wo_best, wi_best = wo_best, wi_best
             if percent % 1.0 == 0:
                 print(percent, "%\t", error)
                 fitness.append(error)
-            if error == min(errors):
-                wo_best, wi_best = self.wo, self.wi
+                s = "weights/" + str(i).zfill(6)
+                self.plot_grid(s, wi_best, wo_best, errors)
+            if random.random() < 0.1:
+                self.wo += numpy.random.uniform(-1.0, 1.0, (self.inputs, self.outputs))
+                self.wi += numpy.random.uniform(-1.0, 1.0, (self.inputs, self.outputs))
+                jump_error = 0.0
+                for p in patterns:
+                    self.forward_pass(numpy.array(p[0]))
+                    jump_error += self.back_propagation(p[1], 0.7, 0.1)
+                if jump_error > error:
+                    self.wo, self.wi = wo_best, wi_best
         self.wo, self.wi = wo_best, wi_best
         plt.plot(fitness)
         plt.show()
+
+    def plot_grid(self, name, wm_i, wm_o, errors):
+        # Cool colour map found here - http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
+        fig1 = plt.subplot(311)
+        fig2 = plt.subplot(312)
+        fig3 = plt.subplot(313)
+
+        fig1.matshow(wm_i.transpose(), cmap="PRGn")
+        fig2.matshow(wm_o.transpose(), cmap="PRGn")
+        fig3.cla()
+        fig3.plot(errors[len(errors)-100:])
+
+        plt.savefig(name + '.png')
+        plt.draw()
 
     def test(self, patterns):
         for p in patterns:
@@ -198,5 +226,18 @@ def main():
     neural_network.weights()
 
 
+def main_two():
+    """
+    Main method for testing the neural network
+    """
+    train, train_targets = get_patterns("#TrainingSetTwo.csv")
+    test, test_targets = get_patterns("#TestingSetTwo.csv")
+    neural_network = NeuralNetwork(15, 4, 1)
+    neural_network.train(train)
+    test_network(neural_network, train, train_targets, "Training")
+    test_network(neural_network, test, test_targets, "Testing")
+    neural_network.weights()
+
+
 if __name__ == '__main__':
-    main()
+    main_two()
