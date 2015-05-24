@@ -41,9 +41,9 @@ class Swarm:
                         neighbour_x = self.p.repair(neighbour_x)
                         if self.p.fit(neighbour_x) > f:
                             particle.x = neighbour_x
-            if len(fits) > 250:
+            if len(fits) > 500:
                 change = (fits[i] / fits[i-50]) - 1
-                if -0.001 <= change <= 0.001:
+                if -0.0001 <= change <= 0.0001:
                     break
         return best_g_best.x, best_g_best_fit
 
@@ -185,7 +185,7 @@ class Fetcher:
 
 def main():
     tickers = list(pandas.read_csv("#PortfolioStocks.csv")["Ticker"])
-    start_date, end_date = "2005-01-01", "2015-01-01"
+    start_date, end_date = "2010-01-01", "2015-05-01"
     fetcher = Fetcher("N9HccV672zuuiU5MUvcq")
     data = fetcher.get_stocks(tickers, start_date, end_date)
 
@@ -232,6 +232,7 @@ def main():
     print("Equal Weights", " Risk =", eq_risk, " Return =", eq_return, " Sharpe =", eq_return / eq_risk)
     print("Optimal Weights", " Risk =", opt_risk, " Return =", opt_return, " Sharpe =", opt_return / opt_risk)
 
+    plt.style.use('bmh')
     plt.plot(eq_c, label="Equal Weights")
     plt.plot(opt_c, label="Optimal Weights")
 
